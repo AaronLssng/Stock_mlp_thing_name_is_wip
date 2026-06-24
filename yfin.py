@@ -1,7 +1,4 @@
-"""
-yfin.py - Library for fetching and processing stock market data
-Pure functions only - no classes
-"""
+
 
 import yfinance as yf
 import pandas as pd
@@ -50,7 +47,7 @@ def get_tickers_from_wikipedia(index_type='sp500'):
         }
         
         if index_type not in index_map:
-            log(f"✗ Unknown index type: {index_type}")
+            log(f"Unknown index type: {index_type}")
             return None
         
         url, table_idx, symbol_col = index_map[index_type]
@@ -59,14 +56,14 @@ def get_tickers_from_wikipedia(index_type='sp500'):
         if response.status_code == 200:
             tables = pd.read_html(response.text)
             tickers = tables[table_idx][symbol_col].tolist()
-            log(f"✓ Fetched {len(tickers)} tickers from Wikipedia")
+            log(f"Fetched {len(tickers)} tickers from Wikipedia")
             return tickers
         else:
             log(f"✗ Wikipedia returned status {response.status_code}")
             return None
             
     except Exception as e:
-        log(f"✗ Error fetching from Wikipedia: {e}")
+        log(f"Error fetching from Wikipedia: {e}")
         return None
 
 
@@ -247,7 +244,7 @@ def fetch_stock_data(symbols, start_date=None, end_date=None, years=10):
     
     log(f"✓ Downloaded data for {len(close_prices.columns)} stocks")
     if failed_tickers:
-        log(f"⚠️ Failed to download: {len(failed_tickers)} tickers")
+        log(f"Failed to download: {len(failed_tickers)} tickers")
     
     return close_prices, volumes
 
@@ -485,9 +482,9 @@ def fetch_summary_data(index_type='sp500', years=10, save_csv=None):
     log("\n[1/4] Getting ticker list...")
     tickers = get_tickers(index_type)
     if not tickers:
-        log("✗ Failed to get tickers")
+        log("Failed to get tickers")
         return None
-    log(f"✓ Working with {len(tickers)} stocks")
+    log(f"Working with {len(tickers)} stocks")
     
     # Set date range
     end_date = datetime.now()
@@ -582,10 +579,10 @@ def save_stock_to_binary(symbol, df, timeframe='1d'):
         else:
             stock_data.create_stock_file(filepath, symbol, timeframe)
             stock_data.append_bars(filepath, df_storage)
-            log(f"✓ Created {filepath} with {len(df_storage)} bars")
+            log(f"Created {filepath} with {len(df_storage)} bars")
         return True
     except Exception as e:
-        log(f"✗ Error saving {symbol}: {e}")
+        log(f"Error saving {symbol}: {e}")
         return False
 
 
@@ -643,7 +640,7 @@ def fetch_and_save_stock(symbol, timeframe='1d', years=5):
     df = fetch_individual_stock(symbol, years=years, timeframe=timeframe)
     
     if df.empty:
-        log(f"✗ No data for {symbol}")
+        log(f"No data for {symbol}")
         return False
     
     return save_stock_to_binary(symbol, df, timeframe)
@@ -658,7 +655,7 @@ def save_sp500_to_binary(df, timeframe='1d'):
     - timeframe: '1d', etc.
     """
     if df is None or df.empty:
-        log("✗ No data to save for SP500")
+        log("No data to save for SP500")
         return False
     
     os.makedirs('data/SP500', exist_ok=True)
@@ -677,14 +674,14 @@ def save_sp500_to_binary(df, timeframe='1d'):
     try:
         if os.path.exists(filepath):
             stock_data.append_bars(filepath, df_storage)
-            log(f"✓ Appended to {filepath}")
+            log(f"Appended to {filepath}")
         else:
             stock_data.create_stock_file(filepath, 'SP500', timeframe)
             stock_data.append_bars(filepath, df_storage)
             log(f"✓ Created {filepath} with {len(df_storage)} bars")
         return True
     except Exception as e:
-        log(f"✗ Error saving SP500: {e}")
+        log(f"Error saving SP500: {e}")
         return False
 
 
