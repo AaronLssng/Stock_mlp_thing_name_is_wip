@@ -1,6 +1,4 @@
-"""
-fetcher.py - Interactive stock data fetcher
-"""
+
 
 import yfinance as yf
 import pandas as pd
@@ -9,7 +7,7 @@ from datetime import datetime, timedelta
 import os
 import sys
 
-# Import our library
+# Import  library
 try:
     from yfin import save_stock_to_binary, load_stock_from_binary
 except ImportError:
