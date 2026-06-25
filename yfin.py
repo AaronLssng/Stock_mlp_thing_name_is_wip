@@ -403,9 +403,9 @@ def fetch_summary_data(index_type='sp500', years=10, save_csv=None):
     log("\n[1/4] Getting ticker list...")
     tickers = get_tickers(index_type)
     if not tickers:
-        log("✗ Failed to get tickers")
+        log("Failed to get tickers")
         return None
-    log(f"✓ Working with {len(tickers)} stocks")
+    log(f"Working with {len(tickers)} stocks")
     
     # Set date range
     end_date = datetime.now()
@@ -493,10 +493,10 @@ def save_stock_to_binary(symbol, df, timeframe='1d'):
         else:
             stock_data.create_stock_file(filepath, symbol, timeframe)
             stock_data.append_bars(filepath, df_storage)
-            log(f"✓ Created {filepath} with {len(df_storage)} bars")
+            log(f"Created {filepath} with {len(df_storage)} bars")
         return True
     except Exception as e:
-        log(f"✗ Error saving {symbol}: {e}")
+        log(f"Error saving {symbol}: {e}")
         return False
 
 
@@ -535,7 +535,7 @@ def fetch_and_save_stock(symbol, timeframe='1d', years=5):
     df = fetch_individual_stock(symbol, years=years, timeframe=timeframe)
     
     if df.empty:
-        log(f"✗ No data for {symbol}")
+        log(f"No data for {symbol}")
         return False
     
     return save_stock_to_binary(symbol, df, timeframe)
@@ -544,7 +544,7 @@ def fetch_and_save_stock(symbol, timeframe='1d', years=5):
 def save_sp500_to_binary(df, timeframe='1d'):
     
     if df is None or df.empty:
-        log("✗ No data to save for SP500")
+        log("No data to save for SP500")
         return False
     
     os.makedirs('data/SP500', exist_ok=True)
