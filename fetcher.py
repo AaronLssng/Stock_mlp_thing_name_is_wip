@@ -1,6 +1,3 @@
-"""
-fetcher.py - Interactive stock data fetcher
-"""
 
 import yfinance as yf
 import pandas as pd
@@ -17,7 +14,7 @@ except ImportError:
     import stock_data
     
     def save_stock_to_binary(symbol, df, timeframe='1d'):
-        """Fallback save function."""
+        
         if df.empty:
             return False
         
@@ -36,11 +33,11 @@ except ImportError:
         try:
             if os.path.exists(filepath):
                 stock_data.append_bars(filepath, df_storage)
-                print(f"✓ Appended {len(df_storage)} bars to {filepath}")
+                print(f"Appended {len(df_storage)} bars to {filepath}")
             else:
                 stock_data.create_stock_file(filepath, symbol, timeframe)
                 stock_data.append_bars(filepath, df_storage)
-                print(f"✓ Created {filepath} with {len(df_storage)} bars")
+                print(f"Created {filepath} with {len(df_storage)} bars")
             return True
         except Exception as e:
             print(f"✗ Error saving {symbol}: {e}")
@@ -48,7 +45,7 @@ except ImportError:
 
 
 def is_valid_stock(symbol):
-    """Simple and reliable stock validation."""
+    
     if not symbol or not isinstance(symbol, str):
         return False, None
     
@@ -74,7 +71,7 @@ def is_valid_stock(symbol):
 
 
 def get_stock_choice():
-    """Get stock symbol from user."""
+    
     while True:
         choice = input("What stock do you want to fetch? (e.g., AAPL): ").strip()
         
@@ -90,7 +87,7 @@ def get_stock_choice():
 
 
 def get_timeframe():
-    """Get timeframe preference from user."""
+  
     print("\nTimeframe options:")
     print("1. Specific number of years")
     print("2. Yesterday only")
@@ -107,7 +104,7 @@ def get_timeframe():
 
 
 def get_years():
-    """Get number of years from user."""
+    
     while True:
         try:
             years = int(input("How many years of data? (1-20): ").strip())
@@ -120,7 +117,7 @@ def get_years():
 
 
 def get_action():
-    """Get user action choice."""
+    
     print("\n" + "=" * 50)
     print("STOCK DATA FETCHER")
     print("=" * 50)
@@ -140,7 +137,7 @@ def get_action():
 
 
 def fetch_stock_data(symbol, timeframe):
-    """Fetch stock data based on parameters."""
+    
     print(f"\nFetching data for {symbol}...")
     
     try:
@@ -187,7 +184,7 @@ def fetch_stock_data(symbol, timeframe):
 
 
 def main():
-    """Main interactive loop."""
+   
     while True:
         action = get_action()
         
@@ -215,7 +212,7 @@ def main():
                 if save_choice == 'y':
                     success = save_stock_to_binary(symbol, data, timeframe_str)
                     if success:
-                        print("✓ Data saved successfully!")
+                        print("Data saved successfully!")
                         
                         # Offer to load back
                         load_choice = input("Load data back to verify? (y/n): ").strip().lower()

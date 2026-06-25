@@ -1,7 +1,4 @@
-"""
-yfin.py - Library for fetching and processing stock market data
-Pure functions only - no classes
-"""
+
 
 import yfinance as yf
 import pandas as pd
@@ -16,7 +13,7 @@ import stock_data
 warnings.filterwarnings('ignore')
 
 
-# ============ CONFIGURATION ============
+#  CONFIGURATION 
 
 MAX_RETRIES = 3
 BATCH_SIZE = 50
@@ -29,7 +26,7 @@ def log(message):
         print(message)
 
 
-# ============ TICKER FUNCTIONS ============
+#  TICKER FUNCTIONS 
 
 def get_tickers_from_wikipedia(index_type='sp500'):
     """
@@ -50,7 +47,7 @@ def get_tickers_from_wikipedia(index_type='sp500'):
         }
         
         if index_type not in index_map:
-            log(f"✗ Unknown index type: {index_type}")
+            log(f"Unknown index type: {index_type}")
             return None
         
         url, table_idx, symbol_col = index_map[index_type]
@@ -59,14 +56,14 @@ def get_tickers_from_wikipedia(index_type='sp500'):
         if response.status_code == 200:
             tables = pd.read_html(response.text)
             tickers = tables[table_idx][symbol_col].tolist()
-            log(f"✓ Fetched {len(tickers)} tickers from Wikipedia")
+            log(f"Fetched {len(tickers)} tickers from Wikipedia")
             return tickers
         else:
-            log(f"✗ Wikipedia returned status {response.status_code}")
+            log(f"Wikipedia returned status {response.status_code}")
             return None
             
     except Exception as e:
-        log(f"✗ Error fetching from Wikipedia: {e}")
+        log(f"Error fetching from Wikipedia: {e}")
         return None
 
 
@@ -103,13 +100,7 @@ def get_hardcoded_tickers(index_type='sp500'):
 
 
 def get_tickers(index_type='sp500', use_fallback=True):
-    """
-    Get tickers for an index.
     
-    Parameters:
-    - index_type: 'sp500', 'dow', or 'nasdaq100'
-    - use_fallback: If True, use hardcoded list if Wikipedia fails
-    """
     tickers = get_tickers_from_wikipedia(index_type)
     
     if tickers is None and use_fallback:
@@ -123,7 +114,7 @@ def get_tickers(index_type='sp500', use_fallback=True):
 
 
 def clean_tickers(tickers):
-    """Fix ticker symbols for Yahoo Finance."""
+    
     ticker_map = {
         'BRK.B': 'BRK-B',
         'BF.B': 'BF-B',
@@ -132,7 +123,7 @@ def clean_tickers(tickers):
     return [ticker_map.get(t, t) for t in tickers]
 
 
-# ============ DOWNLOAD FUNCTIONS ============
+#  DOWNLOAD FUNCTIONS 
 
 def download_with_retry(symbols, start_date, end_date):
     """Download data with retry logic."""
@@ -157,18 +148,7 @@ def download_with_retry(symbols, start_date, end_date):
 
 
 def fetch_index_data(index_symbol='^GSPC', start_date=None, end_date=None, years=10):
-    """
-    Fetch index data (e.g., S&P 500, Dow, Nasdaq).
     
-    Parameters:
-    - index_symbol: Yahoo Finance symbol (default: '^GSPC' for S&P 500)
-    - start_date: Start date (if None, calculated from years)
-    - end_date: End date (if None, uses today)
-    - years: Number of years if start_date not provided
-    
-    Returns:
-    - DataFrame with index OHLCV data
-    """
     if end_date is None:
         end_date = datetime.now()
     if start_date is None:
@@ -184,26 +164,15 @@ def fetch_index_data(index_symbol='^GSPC', start_date=None, end_date=None, years
             auto_adjust=True,
             progress=False
         )
-        log(f"✓ Downloaded {len(data)} days of {index_symbol} data")
+        log(f"Downloaded {len(data)} days of {index_symbol} data")
         return data
     except Exception as e:
-        log(f"✗ Error downloading {index_symbol}: {e}")
+        log(f"Error downloading {index_symbol}: {e}")
         return None
 
 
 def fetch_stock_data(symbols, start_date=None, end_date=None, years=10):
-    """
-    Fetch historical data for multiple stocks.
-    
-    Parameters:
-    - symbols: List of stock symbols
-    - start_date: Start date (if None, calculated from years)
-    - end_date: End date (if None, uses today)
-    - years: Number of years if start_date not provided
-    
-    Returns:
-    - Tuple of (close_prices, volumes) DataFrames
-    """
+   
     if end_date is None:
         end_date = datetime.now()
     if start_date is None:
@@ -239,31 +208,21 @@ def fetch_stock_data(symbols, start_date=None, end_date=None, years=10):
             all_volumes.append(volumes)
     
     if not all_close_prices:
-        log("✗ No data downloaded")
+        log("No data downloaded")
         return None, None
     
     close_prices = pd.concat(all_close_prices, axis=1)
     volumes = pd.concat(all_volumes, axis=1) if all_volumes else None
     
-    log(f"✓ Downloaded data for {len(close_prices.columns)} stocks")
+    log(f"Downloaded data for {len(close_prices.columns)} stocks")
     if failed_tickers:
-        log(f"⚠️ Failed to download: {len(failed_tickers)} tickers")
+        log(f"Failed to download: {len(failed_tickers)} tickers")
     
     return close_prices, volumes
 
 
 def fetch_individual_stock(symbol, years=10, timeframe='1d'):
-    """
-    Fetch data for an individual stock.
     
-    Parameters:
-    - symbol: Stock symbol (e.g., 'AAPL')
-    - years: Number of years of data
-    - timeframe: '1d', '1h', '15m', etc.
-    
-    Returns:
-    - DataFrame with OHLCV data
-    """
     end_date = datetime.now()
     start_date = end_date - timedelta(days=years*365)
     
@@ -283,17 +242,7 @@ def fetch_individual_stock(symbol, years=10, timeframe='1d'):
 
 
 def fetch_multiple_stocks(symbols, years=10, timeframe='1d'):
-    """
-    Fetch data for multiple individual stocks.
     
-    Parameters:
-    - symbols: List of stock symbols
-    - years: Number of years of data
-    - timeframe: '1d', '1h', '15m', etc.
-    
-    Returns:
-    - Dictionary of DataFrames
-    """
     result = {}
     for symbol in symbols:
         data = fetch_individual_stock(symbol, years, timeframe)
@@ -305,20 +254,10 @@ def fetch_multiple_stocks(symbols, years=10, timeframe='1d'):
     return result
 
 
-# ============ FEATURE ENGINEERING ============
+#  FEATURE ENGINEERING 
 
 def add_features(df, price_column='Close', volume_column='Volume'):
-    """
-    Add technical features to a DataFrame.
     
-    Parameters:
-    - df: DataFrame with OHLCV data
-    - price_column: Name of the price column (default: 'Close')
-    - volume_column: Name of the volume column (default: 'Volume')
-    
-    Returns:
-    - DataFrame with added features
-    """
     df = df.copy()
     
     # 1. Returns
@@ -382,21 +321,10 @@ def add_cyclical_features(df, date_column='Date'):
     return df
 
 
-# ============ SUMMARY FUNCTIONS ============
+#  SUMMARY FUNCTIONS 
 
 def create_summary(close_prices, volumes=None, index_data=None, index_name='Index'):
-    """
-    Create a daily summary DataFrame from stock data.
-    
-    Parameters:
-    - close_prices: DataFrame of close prices
-    - volumes: DataFrame of volumes (optional)
-    - index_data: DataFrame of index data (optional)
-    - index_name: Name prefix for index columns
-    
-    Returns:
-    - Daily summary DataFrame
-    """
+   
     summary = []
     
     for idx, date in enumerate(close_prices.index):
@@ -454,17 +382,7 @@ def create_summary(close_prices, volumes=None, index_data=None, index_name='Inde
 
 
 def fetch_summary_data(index_type='sp500', years=10, save_csv=None):
-    """
-    Fetch complete summary data for an index.
     
-    Parameters:
-    - index_type: 'sp500', 'dow', or 'nasdaq100'
-    - years: Number of years of data
-    - save_csv: Path to save CSV (optional)
-    
-    Returns:
-    - DataFrame with summary data
-    """
     index_symbols = {
         'sp500': '^GSPC',
         'dow': '^DJI',
@@ -524,10 +442,10 @@ def fetch_summary_data(index_type='sp500', years=10, save_csv=None):
     # Save to CSV if requested
     if save_csv:
         df.to_csv(save_csv, index=False)
-        log(f"\n✓ Data saved to: {save_csv}")
+        log(f"\nData saved to: {save_csv}")
     
     log("\n" + "=" * 60)
-    log("✓ DATA FETCH COMPLETE!")
+    log("DATA FETCH COMPLETE!")
     log("=" * 60)
     log(f"Total days: {len(df)}")
     log(f"Date range: {df['Date'].iloc[0]} to {df['Date'].iloc[-1]}")
@@ -538,17 +456,10 @@ def fetch_summary_data(index_type='sp500', years=10, save_csv=None):
     return df
 
 
-# ============ BINARY STORAGE FUNCTIONS (C Integration) ============
+#  BINARY STORAGE FUNCTIONS (C Integration) 
 
 def save_stock_to_binary(symbol, df, timeframe='1d'):
-    """
-    Save fetched stock data to binary using C library.
     
-    Parameters:
-    - symbol: Stock symbol
-    - df: DataFrame from fetch_individual_stock
-    - timeframe: '1d', '1h', etc.
-    """
     if df is None or df.empty:
         log(f"✗ No data to save for {symbol}")
         return False
@@ -590,16 +501,7 @@ def save_stock_to_binary(symbol, df, timeframe='1d'):
 
 
 def load_stock_from_binary(symbol, timeframe='1d'):
-    """
-    Load stock data from binary file.
-    
-    Parameters:
-    - symbol: Stock symbol
-    - timeframe: '1d', '1h', etc.
-    
-    Returns:
-    - DataFrame with OHLCV data
-    """
+   
     filepath = f'data/{symbol}/{timeframe}.bin'
     if not os.path.exists(filepath):
         log(f"✗ No data for {symbol}")
@@ -628,17 +530,7 @@ def load_stock_from_binary(symbol, timeframe='1d'):
 
 
 def fetch_and_save_stock(symbol, timeframe='1d', years=5):
-    """
-    Fetch stock data from yfinance and save to binary.
     
-    Parameters:
-    - symbol: Stock symbol
-    - timeframe: '1d', '1h', etc.
-    - years: Number of years of data
-    
-    Returns:
-    - True if successful, False otherwise
-    """
     log(f"Fetching {symbol}...")
     df = fetch_individual_stock(symbol, years=years, timeframe=timeframe)
     
@@ -650,13 +542,7 @@ def fetch_and_save_stock(symbol, timeframe='1d', years=5):
 
 
 def save_sp500_to_binary(df, timeframe='1d'):
-    """
-    Save S&P 500 summary data to binary.
     
-    Parameters:
-    - df: DataFrame from fetch_summary_data
-    - timeframe: '1d', etc.
-    """
     if df is None or df.empty:
         log("✗ No data to save for SP500")
         return False
@@ -677,21 +563,21 @@ def save_sp500_to_binary(df, timeframe='1d'):
     try:
         if os.path.exists(filepath):
             stock_data.append_bars(filepath, df_storage)
-            log(f"✓ Appended to {filepath}")
+            log(f"Appended to {filepath}")
         else:
             stock_data.create_stock_file(filepath, 'SP500', timeframe)
             stock_data.append_bars(filepath, df_storage)
-            log(f"✓ Created {filepath} with {len(df_storage)} bars")
+            log(f"Created {filepath} with {len(df_storage)} bars")
         return True
     except Exception as e:
-        log(f"✗ Error saving SP500: {e}")
+        log(f"Error saving SP500: {e}")
         return False
 
 
-# ============ CONVENIENCE FUNCTIONS ============
+#  CONVENIENCE FUNCTIONS 
 
 def fetch_sp500_summary(years=10, save_csv='sp500_summary.csv', save_binary=True):
-    """Convenience function for S&P 500 data."""
+    
     df = fetch_summary_data('sp500', years, save_csv)
     if df is not None and save_binary:
         save_sp500_to_binary(df)
@@ -699,29 +585,19 @@ def fetch_sp500_summary(years=10, save_csv='sp500_summary.csv', save_binary=True
 
 
 def fetch_dow_summary(years=10, save_csv='dow_summary.csv', save_binary=True):
-    """Convenience function for Dow Jones data."""
+ 
     df = fetch_summary_data('dow', years, save_csv)
     return df
 
 
 def fetch_nasdaq_summary(years=10, save_csv='nasdaq_summary.csv', save_binary=True):
-    """Convenience function for Nasdaq-100 data."""
+    
     df = fetch_summary_data('nasdaq100', years, save_csv)
     return df
 
 
 def fetch_and_store_stocks(symbols, timeframe='1d', years=5):
-    """
-    Fetch multiple stocks and save to binary.
     
-    Parameters:
-    - symbols: List of stock symbols
-    - timeframe: '1d', '1h', etc.
-    - years: Number of years of data
-    
-    Returns:
-    - Dictionary of results
-    """
     results = {}
     for symbol in symbols:
         success = fetch_and_save_stock(symbol, timeframe, years)
@@ -730,16 +606,7 @@ def fetch_and_store_stocks(symbols, timeframe='1d', years=5):
 
 
 def load_multiple_stocks(symbols, timeframe='1d'):
-    """
-    Load multiple stocks from binary.
     
-    Parameters:
-    - symbols: List of stock symbols
-    - timeframe: '1d', '1h', etc.
-    
-    Returns:
-    - Dictionary of DataFrames
-    """
     results = {}
     for symbol in symbols:
         df = load_stock_from_binary(symbol, timeframe)
@@ -748,8 +615,7 @@ def load_multiple_stocks(symbols, timeframe='1d'):
     return results
 
 
-# ============ MAIN (for testing) ============
-
+# MAIN (for testing) 
 if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("STOCK DATA FETCHER - LIBRARY MODE")

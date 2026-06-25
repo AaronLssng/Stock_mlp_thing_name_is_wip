@@ -3,9 +3,7 @@ import numpy as np
 import pickle
 from datetime import datetime, timedelta
 
-# ============================================
 # 1. LOAD AND PREPARE DATA
-# ============================================
 
 df = pd.read_csv('sp500_daily_summary_10y.csv')
 df['Date'] = pd.to_datetime(df['Date'])
@@ -29,9 +27,7 @@ dates = df['Date'].values[valid]
 
 print(f"Clean data shape: X={X_raw.shape}, target={target.shape}")
 
-# ============================================
 # 2. TIME-SERIES SPLIT
-# ============================================
 
 split_ratio = 0.8
 split_idx = int(len(X_raw) * split_ratio)
@@ -82,9 +78,7 @@ y_test = y_test_raw
 
 print(f"\nTraining stats: y_mean={y_mean:.6f}, y_std={y_std:.6f}")
 
-# ============================================
 # 4. MLP FUNCTIONS (BALANCED VERSION)
-# ============================================
 
 def ReLU(x):
     return np.maximum(0, x)
@@ -191,9 +185,8 @@ def predict(network, X):
     activations, _ = forward_pass(network, X)
     return activations[-1]
 
-# ============================================
+ 
 # 5. TRAINING WITH TARGETED BALANCING
-# ============================================
 
 def train_with_targeted_balancing(network, X, y, epochs, learning_rate, batch_size=64,
                                    lambda_reg=0.0001, patience=20, down_weight=4.5,
@@ -319,9 +312,7 @@ def train_with_targeted_balancing(network, X, y, epochs, learning_rate, batch_si
     
     return network, losses, val_losses
 
-# ============================================
 # 6. GRID SEARCH FOR OPTIMAL CONFIGURATION
-# ============================================
 
 input_size = X_train_norm.shape[1]
 
@@ -421,9 +412,7 @@ for down_weight, target_down_ratio in configs:
         'y_pred_test': y_pred_test
     })
 
-# ============================================
 # 7. SELECT BEST MODEL
-# ============================================
 
 # Select based on balanced accuracy
 best_result = max(results, key=lambda x: x['balanced_acc'])
@@ -443,9 +432,8 @@ print(f"Up Accuracy: {best_result['up_acc']:.2%}")
 print(f"Down Accuracy: {best_result['down_acc']:.2%}")
 print(f"Predictions: UP={best_result['n_up_pred']}, DOWN={best_result['n_down_pred']}")
 
-# ============================================
+
 # 8. SAVE MODEL
-# ============================================
 
 with open('trained_model.pkl', 'wb') as f:
     pickle.dump(best_network, f)
@@ -470,9 +458,9 @@ with open('scaler_params.pkl', 'wb') as f:
 
 print("\n✓ Model and parameters saved successfully!")
 
-# ============================================
+
 # 9. DETAILED EVALUATION
-# ============================================
+
 
 print(f"\n{'='*60}")
 print(f"DETAILED EVALUATION")

@@ -181,7 +181,7 @@ DLL_EXPORT int stock_create_file(const char *filepath, const char *stock_name, c
         return STOCK_ERR_IO;
     }
 
-    // Initialize header
+   
     StockHeader header1;
     memset(&header1, 0, sizeof(StockHeader));
 

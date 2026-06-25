@@ -1,5 +1,5 @@
 """
-Quick test script to verify the entire system works.
+Quick test script to verify the entire system works. (AI generated!!!!!)
 """
 
 import os
@@ -11,9 +11,7 @@ print("=" * 60)
 print("SYSTEM TEST")
 print("=" * 60)
 
-# ============================================
 # TEST 1: Check stock_data module
-# ============================================
 print("\n[TEST 1] Checking stock_data module...")
 try:
     import stock_data
@@ -33,16 +31,14 @@ try:
         print("  These functions should be defined in stock_data.py")
         sys.exit(1)
     else:
-        print("✓ All required functions found")
+        print("All required functions found")
         
 except ImportError as e:
-    print(f"✗ Failed to import stock_data: {e}")
+    print(f"Failed to import stock_data: {e}")
     sys.exit(1)
 
-# ============================================
 # TEST 2: Create Binary File
-# ============================================
-print("\n[TEST 2] Creating binary file...")
+print("\n[TEST 2] Creating binary file")
 try:
     # Clean up from previous test
     import shutil
@@ -57,9 +53,8 @@ except Exception as e:
     print(f"✗ Failed to create file: {e}")
     sys.exit(1)
 
-# ============================================
 # TEST 3: Append and Read Bars
-# ============================================
+
 print("\n[TEST 3] Appending and reading bars...")
 try:
     # Create test data
@@ -93,9 +88,7 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
-# ============================================
 # TEST 4: Fetch from yfinance
-# ============================================
 print("\n[TEST 4] Fetching from yfinance...")
 try:
     import yfinance as yf
@@ -108,9 +101,7 @@ try:
 except Exception as e:
     print(f"✗ Test failed: {e}")
 
-# ============================================
 # SUMMARY
-# ============================================
 print("\n" + "=" * 60)
 print("TEST COMPLETE")
 print("=" * 60)
