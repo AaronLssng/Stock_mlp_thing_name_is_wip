@@ -1,0 +1,493 @@
+Stock MLP System - Complete Function Documentation
+
+================================================================================
+C LIBRARY (datbase.c)
+================================================================================
+
+DATA STRUCTURES:
+
+StockHeader (64 bytes):
+- stock_name[16]: Stock symbol (e.g., "AAPL")
+- timeframe[8]: Time interval ("1d", "1h", "15m")
+- num_bars: Number of bars in the file
+- start_timestamp: Unix timestamp of first bar
+- end_timestamp: Unix timestamp of last bar
+- reserved[16]: Padding for future use
+
+StockBar (36 bytes):
+- timestamp: Unix timestamp
+- open: Opening price
+- high: Highest price
+- low: Lowest price
+- close: Closing price
+- volume: Trading volume
+
+ERROR CODES:
+STOCK_SUCCESS = 0
+STOCK_ERR_FILE_NOT_FOUND = -1
+STOCK_ERR_IO = -2
+STOCK_ERR_INVALID_HEADER = -3
+STOCK_ERR_OUT_OF_RANGE = -4
+STOCK_ERR_MEMORY = -5
+STOCK_ERR_INVALID_ARG = -6
+STOCK_ERR_FILE_EXISTS = -7
+
+FUNCTIONS:
+
+stock_create_file(filepath, stock_name, timeframe)
+Purpose: Creates a new binary stock data file with header.
+Parameters:
+- filepath: Path to create the file
+- stock_name: Stock symbol (max 15 chars)
+- timeframe: Time interval (max 7 chars)
+Process: Validates inputs, creates directories, opens file exclusively, writes empty header
+Returns: STOCK_SUCCESS (0) or negative error code
+
+stock_append_bars(filepath, bars, num_bars)
+Purpose: Appends new bar data to an existing binary file.
+Parameters:
+- filepath: Path to existing .bin file
+- bars: Array of bars to append
+- num_bars: Number of bars in the array
+Process: Opens file, reads header, seeks to end, writes bars, updates header
+Returns: STOCK_SUCCESS or error code
+
+stock_read_all(filepath, out_bars, out_count)
+Purpose: Reads all bars from a binary file into memory.
+Parameters:
+- filepath: Path to .bin file
+- out_bars: Output pointer for allocated bar array
+- out_count: Output number of bars read
+Process: Opens file, reads header, allocates memory, reads all bars
+Returns: STOCK_SUCCESS or error code
+Note: Caller must free memory with stock_free_bars()
+
+stock_free_bars(bars)
+Purpose: Frees memory allocated by stock_read_all()
+Parameters: bars - Pointer to bar array to free
+Process: Calls free() on the pointer if not NULL
+
+create_directories(filepath)
+Purpose: Recursively creates all directories in a file path
+Process: Copies path, splits by / or \, creates each directory level
+Returns: STOCK_SUCCESS or error code
+
+set_stock_name(header, name)
+Purpose: Safely sets stock name with bounds checking
+
+set_timeframe(header, tf)
+Purpose: Safely sets timeframe with bounds checking
+
+================================================================================
+PYTHON MODULES
+================================================================================
+
+1. stock_data.py - Python Wrapper for C Library
+
+Class StockHeader (ctypes.Structure): Maps directly to C structure
+Class StockBar (ctypes.Structure): Maps directly to C structure
+
+create_stock_file(filepath, stock_name, timeframe)
+Purpose: Python wrapper for stock_create_file()
+Example: create_stock_file("data/AAPL/1d.bin", "AAPL", "1d")
+
+append_bars(filepath, bars_df)
+Purpose: Appends pandas DataFrame to binary file
+Parameters:
+- filepath: Path to .bin file
+- bars_df: DataFrame with columns: timestamp, open, high, low, close, volume
+Process: Converts DataFrame to numpy types, creates ctypes array, calls C library
+Example: append_bars("data/AAPL/1d.bin", df_storage)
+
+read_all_stock_data(filepath)
+Purpose: Reads entire binary file into numpy array
+Returns: numpy array with dtype BAR_DTYPE containing all bars
+Example: data = read_all_stock_data("data/AAPL/1d.bin")
+
+================================================================================
+
+2. yfin.py - Data Fetching and Management
+
+CONFIGURATION:
+MAX_RETRIES = 3
+BATCH_SIZE = 50
+VERBOSE = True
+
+TICKER FUNCTIONS:
+
+get_tickers_from_wikipedia(index_type='sp500')
+Purpose: Fetches stock tickers from Wikipedia
+Parameters: index_type - 'sp500', 'dow', or 'nasdaq100'
+Process: Fetches HTML table, parses with pandas, extracts tickers
+Returns: List of ticker symbols or None on failure
+Fallback: Calls get_hardcoded_tickers() if Wikipedia fails
+
+get_hardcoded_tickers(index_type='sp500')
+Purpose: Provides fallback ticker lists
+Returns: Hardcoded list of ~100 tickers per index
+
+clean_tickers(tickers)
+Purpose: Handles special ticker formats (BRK.B -> BRK-B)
+
+DOWNLOAD FUNCTIONS:
+
+download_with_retry(symbols, start_date, end_date)
+Purpose: Downloads data with exponential backoff retry logic
+Process: Attempts download, retries up to MAX_RETRIES times, sleeps 2 seconds between
+Returns: DataFrame or None on failure
+
+fetch_index_data(index_symbol='^GSPC', start_date=None, end_date=None, years=10)
+Purpose: Downloads index data
+Default symbols: ^GSPC (S&P 500), ^DJI (Dow), ^NDX (NASDAQ-100)
+Returns: DataFrame
+
+fetch_stock_data(symbols, start_date=None, end_date=None, years=10)
+Purpose: Bulk downloads stock data in batches
+Process: Divides into batches of 50, downloads each with retry, combines results
+Returns: Tuple of (close_prices, volumes) or (None, None) on failure
+
+fetch_individual_stock(symbol, years=10, timeframe='1d')
+Purpose: Downloads data for a single stock
+Parameters: symbol, years, timeframe ('1d', '1h', '15m', etc.)
+Returns: DataFrame or empty DataFrame on failure
+
+FEATURE ENGINEERING:
+
+add_features(df, price_column='Close', volume_column='Volume')
+Purpose: Adds technical indicators to the dataset
+Features added:
+- Return_Pct (percentage change)
+- Lagged returns (1, 2, 3, 5, 10, 20 days)
+- Rolling statistics (volatility, volume moving averages)
+- Price ratios (High/Low, Close/Open)
+- Moving average ratios (MA20, MA50, MA200)
+- ATR (Average True Range, 14-day)
+Returns: DataFrame with all new features
+
+add_cyclical_features(df, date_column='Date')
+Purpose: Adds cyclical time features for seasonality
+Features added: Year, Month, Day, DayOfWeek, DayOfYear, WeekOfYear
+Also adds sin/cos encoding for Month and DayOfWeek
+Returns: DataFrame with new features
+
+SUMMARY FUNCTIONS:
+
+create_summary(close_prices, volumes, index_data, index_name)
+Purpose: Creates a daily summary DataFrame from bulk data
+Output includes: Date, Index OHLCV, stock statistics (count, mean, median, std, min, max, sum), daily returns statistics, volume statistics
+Returns: Summary DataFrame
+
+fetch_summary_data(index_type='sp500', years=10, save_csv=None)
+Purpose: Complete pipeline to fetch, summarize, and save data
+Process: Gets tickers, fetches index data, fetches stock data in batches, creates summary, adds features
+Returns: Summary DataFrame
+
+BINARY STORAGE FUNCTIONS:
+
+save_stock_to_binary(symbol, df, timeframe='1d')
+Purpose: Saves stock data to binary format using C library
+Process: Creates directory, converts DataFrame, drops NaN, calls append_bars or create_stock_file
+Returns: Boolean indicating success
+
+load_stock_from_binary(symbol, timeframe='1d')
+Purpose: Loads stock data from binary file
+Process: Reads binary data, converts to DataFrame, adds Date index, renames columns
+Returns: DataFrame or None on failure
+
+fetch_and_save_stock(symbol, timeframe='1d', years=5)
+Purpose: One-step fetch and save for a stock
+Example: fetch_and_save_stock('AAPL', timeframe='1d', years=5)
+
+CONVENIENCE FUNCTIONS:
+
+fetch_sp500_summary(years=10, save_csv='sp500_summary.csv')
+Purpose: Fetches S&P 500 data and saves both CSV and binary
+
+fetch_and_store_stocks(symbols, timeframe='1d', years=5)
+Purpose: Fetches and stores multiple stocks
+
+load_multiple_stocks(symbols, timeframe='1d')
+Purpose: Loads multiple stocks from binary storage
+
+================================================================================
+
+3. fetcher.py - Interactive CLI Interface
+
+get_action()
+Purpose: Displays main menu and gets user choice
+Options: 1. Fetch stock data, 2. Help, 3. Exit
+Returns: Integer choice (1-3)
+
+get_stock_choice()
+Purpose: Validates stock symbol through user input
+Process: Prompts user, calls is_valid_stock(), loops until valid
+Returns: Valid stock symbol string
+
+is_valid_stock(symbol)
+Purpose: Validates if a stock symbol exists
+Process: Checks yfinance info endpoint, fallback to fetching 1 day of data
+Returns: Tuple of (bool, symbol)
+
+get_timeframe()
+Purpose: Gets timeframe selection from user
+Options: 1. Specific number of years (1-20), 2. Yesterday only
+Returns: String - number of years or 'yesterday'
+
+get_years()
+Purpose: Gets number of years from user
+Returns: Integer between 1 and 20
+
+fetch_stock_data(symbol, timeframe)
+Purpose: Fetches data for a specific stock based on user's timeframe
+Process: If 'yesterday' gets last trading day, if years downloads specified years, shows preview
+Returns: Tuple of (dataframe, timeframe_string)
+
+main()
+Purpose: Main program loop
+Process: Shows menu, gets symbol/timeframe, fetches data, shows preview, asks to save to binary, offers to load back and verify
+
+================================================================================
+
+4. mlp_prep.py - MLP Neural Network
+
+DATA PREPARATION:
+
+normalize_data(X_train, X_test)
+Purpose: Standardizes features using z-score normalization
+Process: Calculates mean and std from training data, applies to both sets, handles zero std
+Returns: (X_train_norm, X_test_norm, mean, std)
+
+NEURAL NETWORK FUNCTIONS:
+
+ReLU(x)
+Purpose: ReLU activation function (max(0, x))
+
+ReLU_deriv(x)
+Purpose: Derivative of ReLU (1 if x > 0 else 0)
+
+initialize_layer(input_size, output_size, seed=None)
+Purpose: Initializes a single layer with He initialization
+Formula: scale = sqrt(2.0 / input_size)
+Returns: (weights, biases)
+
+initialize_network(layer_size, seed=42)
+Purpose: Initializes entire neural network
+Parameter: layer_size list (e.g., [input_size, 64, 32, 16, 1])
+Returns: List of layer dictionaries
+
+forward_pass(network, X)
+Purpose: Performs forward propagation
+Process: Passes input through each layer, applies ReLU except final layer, stores activations
+Returns: (activations, network with cached Z/A)
+
+mean_squared_error(y_true, y_pred)
+Purpose: Standard MSE loss function
+
+weighted_mse(y_true, y_pred, down_weight=4.5)
+Purpose: Weighted MSE for imbalanced data
+Formula: weights = down_weight if y_true < 0 else 1.0, weights = weights * (1.0 + |y_true| * 3), return mean(weights * (y_true - y_pred)²)
+Purpose: Gives more importance to down days (rarer event)
+
+weighted_mse_derivative(y_true, y_pred, down_weight=4.5)
+Purpose: Derivative of weighted MSE for backpropagation
+
+backward_pass(network, activations, y_true, lambda_reg, down_weight)
+Purpose: Performs backpropagation with L2 regularization
+Process: Calculates output gradient, propagates through hidden layers, applies ReLU derivative, adds regularization, clips gradients
+Returns: Gradients for each layer
+
+update_weights(network, gradients, learning_rate)
+Purpose: Updates weights using gradient descent
+
+TRAINING FUNCTIONS:
+
+train_with_targeted_balancing(network, X, y, epochs, learning_rate, batch_size=64, lambda_reg=0.0001, patience=20, down_weight=4.5, target_down_ratio=0.4, verbose=True)
+Purpose: Trains the network with balanced batch sampling
+Key Features:
+- Targeted Down Ratio: Ensures batches contain specified percentage of down days
+- Weighted Loss: Uses weighted_mse() to focus on down days
+- Early Stopping: Stops when validation loss doesn't improve for patience epochs
+- Learning Rate Decay: Reduces LR by 5% when validation loss increases
+- Validation Split: Uses 10% of training data for validation
+Parameters: down_weight (default 4.5), target_down_ratio (default 0.4)
+Process: Splits data for validation, identifies up/down indices, samples batches with target ratio, forward/backward pass, updates weights, evaluates validation loss
+Returns: (trained_network, train_losses, val_losses)
+
+GRID SEARCH:
+
+Tests configurations: [(4.0, 0.45), (4.5, 0.45), (5.0, 0.45), (4.5, 0.50), (5.0, 0.50)]
+Architecture: [input_size, 64, 32, 16, 1]
+
+EVALUATION:
+
+Threshold Optimization:
+- Tests thresholds from -0.003 to 0.003
+- Calculates balanced accuracy at each threshold
+- Selects threshold maximizing balanced accuracy
+Metrics: Directional Accuracy, Balanced Accuracy, Up Accuracy, Down Accuracy
+
+MODEL PERSISTENCE:
+
+trained_model.pkl:
+- List of layer dictionaries containing trained weights and biases
+
+scaler_params.pkl:
+- mean: Feature means
+- std: Feature stds
+- y_mean: Target mean
+- y_std: Target std
+- feature_cols: Feature columns
+- split_idx: Split index
+- train_start: Training start date
+- train_end: Training end date
+- test_start: Test start date
+- test_end: Test end date
+- threshold: Best threshold
+- down_weight: Best down weight
+- target_down_ratio: Best target down ratio
+
+================================================================================
+
+5. test_systems.py - System Verification
+
+TEST 1: Module Import
+Checks that stock_data imports correctly and has required functions:
+- create_stock_file()
+- append_bars()
+- read_all_stock_data()
+
+TEST 2: Binary File Creation
+Creates test binary file and verifies it exists
+
+TEST 3: Append and Read
+- Creates test data with 3 bars
+- Appends to binary file
+- Reads back
+- Verifies data length matches
+
+TEST 4: yfinance Integration
+Fetches AAPL data for 1 month to verify API connectivity
+
+SUMMARY: Prints all files in the data/ directory with sizes
+
+================================================================================
+USAGE EXAMPLES
+================================================================================
+
+Example 1: Fetch and Save Individual Stock
+from yfin import fetch_and_save_stock, load_stock_from_binary
+fetch_and_save_stock('AAPL', timeframe='1d', years=5)
+df = load_stock_from_binary('AAPL')
+print(df.head())
+
+Example 2: Bulk Fetch SP500 Data
+from yfin import fetch_sp500_summary
+df = fetch_sp500_summary(years=10, save_csv='sp500_daily_summary.csv')
+print(f"Data shape: {df.shape}")
+
+Example 3: Load and Use Trained Model
+import pickle
+import numpy as np
+with open('trained_model.pkl', 'rb') as f:
+    network = pickle.load(f)
+with open('scaler_params.pkl', 'rb') as f:
+    params = pickle.load(f)
+from mlp_prep import predict
+X_new = np.array([...])
+X_norm = (X_new - params['mean']) / params['std']
+prediction = predict(network, X_norm)
+threshold = params['threshold']
+direction = "UP" if prediction > threshold else "DOWN"
+
+================================================================================
+INSTALLATION & SETUP
+================================================================================
+
+1. Install Dependencies:
+pip install yfinance pandas numpy requests
+
+2. Compile C Library (Windows):
+gcc -shared -o libstockdata.dll datbase.c -O3
+
+3. Compile C Library (Linux):
+gcc -shared -fPIC -o libstockdata.so datbase.c -O3
+
+4. Test Installation:
+python test_systems.py
+
+5. Run Interactive Fetcher:
+python fetcher.py
+
+6. Fetch Bulk Data:
+from yfin import fetch_sp500_summary
+df = fetch_sp500_summary(years=10, save_csv='sp500_10y.csv')
+
+7. Train MLP Model:
+python mlp_prep.py
+
+================================================================================
+ERROR CODES REFERENCE
+================================================================================
+
+0: STOCK_SUCCESS - Operation successful
+-1: STOCK_ERR_FILE_NOT_FOUND - File doesn't exist
+-2: STOCK_ERR_IO - Input/Output error
+-3: STOCK_ERR_INVALID_HEADER - Corrupt or invalid header
+-5: STOCK_ERR_MEMORY - Memory allocation failed
+-6: STOCK_ERR_INVALID_ARG - Invalid argument passed
+-7: STOCK_ERR_FILE_EXISTS - File already exists
+
+================================================================================
+PERFORMANCE NOTES
+================================================================================
+
+C Library:
+- Memory-mapped I/O for direct binary reading/writing
+- No parsing overhead from direct struct mapping
+- Bulk operations with single write() for all bars
+- O(1) header updates on append
+
+Batch Processing:
+- 50 stocks per batch balances memory and network efficiency
+- Retry logic handles transient network failures
+- Progress tracking shows batch completion
+
+MLP Optimization:
+- Vectorized operations using NumPy
+- Early stopping prevents overfitting
+- Learning rate decay for fine-tuned convergence
+- Gradient clipping prevents gradient explosion
+
+================================================================================
+CONTRIBUTING GUIDELINES
+================================================================================
+
+Coding Style:
+- Avoid OOP unless required by external libraries
+- Prefer functions and modules over classes
+- Follow PEP 8 for Python code
+- Write clear, self-documenting code
+- Add docstrings for all public functions
+
+Pull Request Process:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test your changes
+5. Submit a pull request
+6. Your code will be reviewed before merging
+
+Documentation:
+- Update README.md for major changes
+- Add docstrings to all new functions
+- Update this document for structural changes
+
+================================================================================
+LICENSE
+================================================================================
+
+MIT License - See LICENSE file for details.
+
+Documentation Version: 1.0.0
+Last Updated: 2026-06-25
+Project Status: Active Development
