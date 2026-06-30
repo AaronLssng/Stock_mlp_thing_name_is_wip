@@ -9,26 +9,18 @@ import stock_data  # Your C library wrapper
 from yfin import fetch_and_save_stock, load_stock_from_binary
 
 # ============================================
-# 1. CONFIGURATION
-# ============================================
-
-SYMBOL = "AAPL"  # Change this to any stock you have in data/
-TIMEFRAME = "1d"
-YEARS = 10
-
-# ============================================
-# 2. LOAD DATA FROM BINARY FILES
+# 1. LOAD DATA FROM BINARY FILES
 # ============================================
 
 
-def load_stock_data(symbol, timeframe="1d"):
+def load_stock_data(symbol, timeframe="1d", years=10):
     """Load stock data from binary file"""
     filepath = f"data/{symbol}/{timeframe}.bin"
 
     if not os.path.exists(filepath):
         print(f"✗ Binary file not found: {filepath}")
         print(f"  Fetching {symbol} data first...")
-        fetch_and_save_stock(symbol, timeframe=timeframe, years=YEARS)
+        fetch_and_save_stock(symbol, timeframe=timeframe, years=years)
 
         # Try loading again
         if not os.path.exists(filepath):
@@ -51,7 +43,7 @@ def load_stock_data(symbol, timeframe="1d"):
 
 
 # ============================================
-# 3. FEATURE ENGINEERING
+# 2. FEATURE ENGINEERING
 # ============================================
 
 
@@ -100,67 +92,7 @@ def add_features(df):
 
 
 # ============================================
-# 4. LOAD AND PREPARE DATA
-# ============================================
-
-# Load stock data from binary
-df = load_stock_data(SYMBOL, TIMEFRAME)
-
-if df is None:
-    print(f"✗ Failed to load {SYMBOL}. Exiting.")
-    exit(1)
-
-# Add features
-print(f"\nAdding technical features...")
-df = add_features(df)
-print(f"Features added. Shape: {df.shape}")
-
-# Prepare input and target
-feature_cols = [
-    col for col in df.columns if col not in ["Open", "High", "Low", "Close", "Volume"]
-]
-print(f"Feature columns ({len(feature_cols)}): {feature_cols[:5]}...")
-
-X_raw = df[feature_cols].values
-target = df["Close"].pct_change().shift(-1).values  # Predict next day return
-
-# Remove NaN rows
-valid = ~np.isnan(target) & ~np.isnan(X_raw).any(axis=1)
-X_raw = X_raw[valid]
-target = target[valid]
-dates = df.index.values[valid]
-
-print(f"Clean data shape: X={X_raw.shape}, target={target.shape}")
-
-# ============================================
-# 5. TIME-SERIES SPLIT
-# ============================================
-
-split_ratio = 0.8
-split_idx = int(len(X_raw) * split_ratio)
-
-X_train_raw = X_raw[:split_idx]
-X_test_raw = X_raw[split_idx:]
-y_train_raw = target[:split_idx]
-y_test_raw = target[split_idx:]
-dates_train = dates[:split_idx]
-dates_test = dates[split_idx:]
-
-print(
-    f"\nTrain period: {pd.Timestamp(dates_train[0])} to {pd.Timestamp(dates_train[-1])}"
-)
-print(f"Test period: {pd.Timestamp(dates_test[0])} to {pd.Timestamp(dates_test[-1])}")
-print(f"Train samples: {len(X_train_raw)}, Test samples: {len(X_test_raw)}")
-
-# Calculate class distribution
-train_up = np.sum(y_train_raw > 0)
-train_down = np.sum(y_train_raw < 0)
-print(f"\nTraining class distribution:")
-print(f"  Up days: {train_up} ({train_up / len(y_train_raw):.1%})")
-print(f"  Down days: {train_down} ({train_down / len(y_train_raw):.1%})")
-
-# ============================================
-# 6. NORMALIZATION
+# 3. NORMALIZATION
 # ============================================
 
 
@@ -175,22 +107,8 @@ def normalize_data(X_train, X_test):
     return X_train_norm, X_test_norm, mean, std
 
 
-X_train_norm, X_test_norm, mean, std = normalize_data(X_train_raw, X_test_raw)
-
-# Normalize target
-y_mean = y_train_raw.mean()
-y_std = y_train_raw.std()
-
-y_train_norm = (y_train_raw - y_mean) / y_std
-y_test_norm = (y_test_raw - y_mean) / y_std
-
-y_train = y_train_raw
-y_test = y_test_raw
-
-print(f"\nTraining stats: y_mean={y_mean:.6f}, y_std={y_std:.6f}")
-
 # ============================================
-# 7. MLP FUNCTIONS (BALANCED VERSION)
+# 4. MLP FUNCTIONS (BALANCED VERSION)
 # ============================================
 
 
@@ -303,7 +221,7 @@ def predict(network, X):
 
 
 # ============================================
-# 8. TRAINING WITH TARGETED BALANCING
+# 5. TRAINING WITH TARGETED BALANCING
 # ============================================
 
 
@@ -472,203 +390,295 @@ def train_with_targeted_balancing(
 
 
 # ============================================
-# 9. GRID SEARCH FOR OPTIMAL CONFIGURATION
+# 6. MAIN FUNCTION - THE ENTRY POINT
 # ============================================
 
-input_size = X_train_norm.shape[1]
 
-# Test different configurations
-configs = [
-    (4.0, 0.45),
-    (4.5, 0.45),
-    (5.0, 0.45),
-]
+def train_model(symbol, timeframe, years):
+    """
+    Main function to train the stock prediction model.
 
-best_architecture = [input_size, 64, 32, 16, 1]
-results = []
+    Args:
+        symbol: Stock symbol (e.g., 'AAPL', 'MSFT')
+        timeframe: Data timeframe (e.g., '1d', '1h')
+        years: Number of years of historical data
 
-for down_weight, target_down_ratio in configs:
-    print(f"\n{'=' * 60}")
+    Returns:
+        dict: Training results including network, predictions, and metrics
+    """
+    print(f"Configuration:")
+    print(f"  Symbol: {symbol}")
+    print(f"  Timeframe: {timeframe}")
+    print(f"  Years: {years}")
+
+    # Load stock data from binary
+    df = load_stock_data(symbol, timeframe, years)
+
+    if df is None:
+        print(f"✗ Failed to load {symbol}. Exiting.")
+        return None
+
+    # Add features
+    print(f"\nAdding technical features...")
+    df = add_features(df)
+    print(f"Features added. Shape: {df.shape}")
+
+    # Prepare input and target
+    feature_cols = [
+        col
+        for col in df.columns
+        if col not in ["Open", "High", "Low", "Close", "Volume"]
+    ]
+    print(f"Feature columns ({len(feature_cols)}): {feature_cols[:5]}...")
+
+    X_raw = df[feature_cols].values
+    target = df["Close"].pct_change().shift(-1).values  # Predict next day return
+
+    # Remove NaN rows
+    valid = ~np.isnan(target) & ~np.isnan(X_raw).any(axis=1)
+    X_raw = X_raw[valid]
+    target = target[valid]
+    dates = df.index.values[valid]
+
+    print(f"Clean data shape: X={X_raw.shape}, target={target.shape}")
+
+    # Time-series split
+    split_ratio = 0.8
+    split_idx = int(len(X_raw) * split_ratio)
+
+    X_train_raw = X_raw[:split_idx]
+    X_test_raw = X_raw[split_idx:]
+    y_train_raw = target[:split_idx]
+    y_test_raw = target[split_idx:]
+    dates_train = dates[:split_idx]
+    dates_test = dates[split_idx:]
+
     print(
-        f"Testing: down_weight={down_weight}, target_down_ratio={target_down_ratio:.1%}"
+        f"\nTrain period: {pd.Timestamp(dates_train[0])} to {pd.Timestamp(dates_train[-1])}"
     )
-    print(f"Architecture: {best_architecture}")
+    print(
+        f"Test period: {pd.Timestamp(dates_test[0])} to {pd.Timestamp(dates_test[-1])}"
+    )
+    print(f"Train samples: {len(X_train_raw)}, Test samples: {len(X_test_raw)}")
+
+    # Calculate class distribution
+    train_up = np.sum(y_train_raw > 0)
+    train_down = np.sum(y_train_raw < 0)
+    print(f"\nTraining class distribution:")
+    print(f"  Up days: {train_up} ({train_up / len(y_train_raw):.1%})")
+    print(f"  Down days: {train_down} ({train_down / len(y_train_raw):.1%})")
+
+    # Normalize data
+    X_train_norm, X_test_norm, mean, std = normalize_data(X_train_raw, X_test_raw)
+
+    # Normalize target
+    y_mean = y_train_raw.mean()
+    y_std = y_train_raw.std()
+
+    y_train_norm = (y_train_raw - y_mean) / y_std
+    y_test_norm = (y_test_raw - y_mean) / y_std
+
+    y_train = y_train_raw
+    y_test = y_test_raw
+
+    print(f"\nTraining stats: y_mean={y_mean:.6f}, y_std={y_std:.6f}")
+
+    # Grid search for optimal configuration
+    input_size = X_train_norm.shape[1]
+
+    configs = [
+        (4.0, 0.45),
+        (4.5, 0.45),
+        (5.0, 0.45),
+    ]
+
+    best_architecture = [input_size, 64, 32, 16, 1]
+    results = []
+
+    for down_weight, target_down_ratio in configs:
+        print(f"\n{'=' * 60}")
+        print(
+            f"Testing: down_weight={down_weight}, target_down_ratio={target_down_ratio:.1%}"
+        )
+        print(f"Architecture: {best_architecture}")
+        print(f"{'=' * 60}")
+
+        network = initialize_network(best_architecture, seed=42)
+        total_params = sum(layer["W"].size + layer["b"].size for layer in network)
+        print(f"Total parameters: {total_params:,}")
+
+        epochs = 200
+        learning_rate = 0.003
+        batch_size = 64
+        lambda_reg = 0.0001
+
+        print("Starting training...")
+        network, train_losses, val_losses = train_with_targeted_balancing(
+            network,
+            X_train_norm,
+            y_train_norm,
+            epochs,
+            learning_rate,
+            batch_size,
+            lambda_reg,
+            patience=25,
+            down_weight=down_weight,
+            target_down_ratio=target_down_ratio,
+            verbose=True,
+        )
+
+        # Evaluate on test set
+        y_pred_test_norm = predict(network, X_test_norm)
+        y_pred_test = y_pred_test_norm * y_std + y_mean
+
+        # Find optimal threshold
+        thresholds = np.linspace(-0.003, 0.003, 31)
+        best_threshold = 0.0
+        best_balanced_acc = 0
+        best_up_acc = 0
+        best_down_acc = 0
+
+        for threshold in thresholds:
+            pred_direction = np.where(y_pred_test.flatten() > threshold, 1, -1)
+            actual_direction = np.sign(y_test)
+
+            correct_up = np.sum((actual_direction == 1) & (pred_direction == 1))
+            total_up = np.sum(actual_direction == 1)
+            correct_down = np.sum((actual_direction == -1) & (pred_direction == -1))
+            total_down = np.sum(actual_direction == -1)
+
+            up_acc = correct_up / total_up if total_up > 0 else 0
+            down_acc = correct_down / total_down if total_down > 0 else 0
+            balanced_acc = (up_acc + down_acc) / 2
+
+            if balanced_acc > best_balanced_acc:
+                best_balanced_acc = balanced_acc
+                best_threshold = threshold
+                best_up_acc = up_acc
+                best_down_acc = down_acc
+
+        pred_direction = np.where(y_pred_test.flatten() > best_threshold, 1, -1)
+        direction_acc = np.mean(np.sign(y_test) == pred_direction)
+
+        n_down_pred = np.sum(pred_direction == -1)
+        n_up_pred = np.sum(pred_direction == 1)
+
+        print(f"\nResults:")
+        print(f"  Threshold: {best_threshold:.4f}")
+        print(f"  Directional Accuracy: {direction_acc:.2%}")
+        print(f"  Balanced Accuracy: {best_balanced_acc:.2%}")
+        print(f"  Up Accuracy: {best_up_acc:.2%}")
+        print(f"  Down Accuracy: {best_down_acc:.2%}")
+        print(f"  Predictions: UP={n_up_pred}, DOWN={n_down_pred}")
+
+        results.append(
+            {
+                "down_weight": down_weight,
+                "target_down_ratio": target_down_ratio,
+                "threshold": best_threshold,
+                "direction_acc": direction_acc,
+                "balanced_acc": best_balanced_acc,
+                "up_acc": best_up_acc,
+                "down_acc": best_down_acc,
+                "n_up_pred": n_up_pred,
+                "n_down_pred": n_down_pred,
+                "network": network,
+                "y_pred_test": y_pred_test,
+            }
+        )
+
+    # Select best model
+    best_result = max(results, key=lambda x: x["balanced_acc"])
+    best_network = best_result["network"]
+    best_threshold = best_result["threshold"]
+    best_y_pred = best_result["y_pred_test"]
+
+    print(f"\n{'=' * 60}")
+    print(f"BEST MODEL FOUND FOR {symbol}")
+    print(f"{'=' * 60}")
+    print(f"Down Weight: {best_result['down_weight']}")
+    print(f"Target Down Ratio: {best_result['target_down_ratio']:.1%}")
+    print(f"Threshold: {best_threshold:.4f}")
+    print(f"Directional Accuracy: {best_result['direction_acc']:.2%}")
+    print(f"Balanced Accuracy: {best_result['balanced_acc']:.2%}")
+    print(f"Up Accuracy: {best_result['up_acc']:.2%}")
+    print(f"Down Accuracy: {best_result['down_acc']:.2%}")
+    print(
+        f"Predictions: UP={best_result['n_up_pred']}, DOWN={best_result['n_down_pred']}"
+    )
+
+    # Save model
+    with open(f"trained_model_{symbol}.pkl", "wb") as f:
+        pickle.dump(best_network, f)
+
+    scaler_params = {
+        "mean": mean,
+        "std": std,
+        "y_mean": y_mean,
+        "y_std": y_std,
+        "feature_cols": feature_cols,
+        "split_idx": split_idx,
+        "train_start": dates_train[0],
+        "train_end": dates_train[-1],
+        "test_start": dates_test[0],
+        "test_end": dates_test[-1],
+        "threshold": best_threshold,
+        "down_weight": best_result["down_weight"],
+        "target_down_ratio": best_result["target_down_ratio"],
+        "symbol": symbol,
+    }
+    with open(f"scaler_params_{symbol}.pkl", "wb") as f:
+        pickle.dump(scaler_params, f)
+
+    print(f"\n✓ Model and parameters saved for {symbol}!")
+
+    # Detailed evaluation
+    print(f"\n{'=' * 60}")
+    print(f"DETAILED EVALUATION FOR {symbol}")
     print(f"{'=' * 60}")
 
-    network = initialize_network(best_architecture, seed=42)
-    total_params = sum(layer["W"].size + layer["b"].size for layer in network)
-    print(f"Total parameters: {total_params:,}")
-
-    epochs = 200
-    learning_rate = 0.003
-    batch_size = 64
-    lambda_reg = 0.0001
-
-    print("Starting training...")
-    network, train_losses, val_losses = train_with_targeted_balancing(
-        network,
-        X_train_norm,
-        y_train_norm,
-        epochs,
-        learning_rate,
-        batch_size,
-        lambda_reg,
-        patience=25,
-        down_weight=down_weight,
-        target_down_ratio=target_down_ratio,
-        verbose=True,
-    )
-
-    # Evaluate on test set
-    y_pred_test_norm = predict(network, X_test_norm)
-    y_pred_test = y_pred_test_norm * y_std + y_mean
-
-    # Find optimal threshold
-    thresholds = np.linspace(-0.003, 0.003, 31)
-    best_threshold = 0.0
-    best_balanced_acc = 0
-    best_up_acc = 0
-    best_down_acc = 0
-
-    for threshold in thresholds:
-        pred_direction = np.where(y_pred_test.flatten() > threshold, 1, -1)
-        actual_direction = np.sign(y_test)
-
-        correct_up = np.sum((actual_direction == 1) & (pred_direction == 1))
-        total_up = np.sum(actual_direction == 1)
-        correct_down = np.sum((actual_direction == -1) & (pred_direction == -1))
-        total_down = np.sum(actual_direction == -1)
-
-        up_acc = correct_up / total_up if total_up > 0 else 0
-        down_acc = correct_down / total_down if total_down > 0 else 0
-        balanced_acc = (up_acc + down_acc) / 2
-
-        if balanced_acc > best_balanced_acc:
-            best_balanced_acc = balanced_acc
-            best_threshold = threshold
-            best_up_acc = up_acc
-            best_down_acc = down_acc
-
+    y_pred_test = best_y_pred
     pred_direction = np.where(y_pred_test.flatten() > best_threshold, 1, -1)
-    direction_acc = np.mean(np.sign(y_test) == pred_direction)
+    actual_direction = np.sign(y_test)
 
-    n_down_pred = np.sum(pred_direction == -1)
-    n_up_pred = np.sum(pred_direction == 1)
+    print(f"\nThreshold: {best_threshold:.4f}")
 
-    print(f"\nResults:")
-    print(f"  Threshold: {best_threshold:.4f}")
-    print(f"  Directional Accuracy: {direction_acc:.2%}")
-    print(f"  Balanced Accuracy: {best_balanced_acc:.2%}")
-    print(f"  Up Accuracy: {best_up_acc:.2%}")
-    print(f"  Down Accuracy: {best_down_acc:.2%}")
-    print(f"  Predictions: UP={n_up_pred}, DOWN={n_down_pred}")
+    print("\nSAMPLE PREDICTIONS (First 30 test samples):")
+    print("Date       | Actual   | Predicted | Pred Dir | Correct")
+    print("-" * 65)
 
-    results.append(
-        {
-            "down_weight": down_weight,
-            "target_down_ratio": target_down_ratio,
-            "threshold": best_threshold,
-            "direction_acc": direction_acc,
-            "balanced_acc": best_balanced_acc,
-            "up_acc": best_up_acc,
-            "down_acc": best_down_acc,
-            "n_up_pred": n_up_pred,
-            "n_down_pred": n_down_pred,
-            "network": network,
-            "y_pred_test": y_pred_test,
-        }
+    for i in range(min(30, len(y_test))):
+        date_val = dates_test[i]
+        date_str = pd.Timestamp(date_val).strftime("%Y-%m-%d")
+
+        actual = y_test[i]
+        pred = y_pred_test[i][0]
+        pred_dir = "UP" if pred > best_threshold else "DOWN"
+        actual_dir = "UP" if actual > 0 else "DOWN"
+        correct = "✓" if np.sign(actual) == np.sign(pred - best_threshold) else "✗"
+        print(f"{date_str} | {actual:+.6f} | {pred:+.6f} | {pred_dir:4s} | {correct}")
+
+    # Confusion matrix
+    print("\nConfusion Matrix Summary:")
+    correct_up = np.sum((actual_direction == 1) & (pred_direction == 1))
+    total_up = np.sum(actual_direction == 1)
+    correct_down = np.sum((actual_direction == -1) & (pred_direction == -1))
+    total_down = np.sum(actual_direction == -1)
+
+    print(f"  True Up: {total_up}, Pred Up: {correct_up} ({correct_up / total_up:.1%})")
+    print(
+        f"  True Down: {total_down}, Pred Down: {correct_down} ({correct_down / total_down:.1%})"
     )
 
-# ============================================
-# 10. SELECT BEST MODEL
-# ============================================
+    print(f"\n{'=' * 60}")
+    print("TRAINING COMPLETE!")
+    print(f"{'=' * 60}")
 
-best_result = max(results, key=lambda x: x["balanced_acc"])
-best_network = best_result["network"]
-best_threshold = best_result["threshold"]
-best_y_pred = best_result["y_pred_test"]
-
-print(f"\n{'=' * 60}")
-print(f"BEST MODEL FOUND FOR {SYMBOL}")
-print(f"{'=' * 60}")
-print(f"Down Weight: {best_result['down_weight']}")
-print(f"Target Down Ratio: {best_result['target_down_ratio']:.1%}")
-print(f"Threshold: {best_threshold:.4f}")
-print(f"Directional Accuracy: {best_result['direction_acc']:.2%}")
-print(f"Balanced Accuracy: {best_result['balanced_acc']:.2%}")
-print(f"Up Accuracy: {best_result['up_acc']:.2%}")
-print(f"Down Accuracy: {best_result['down_acc']:.2%}")
-print(f"Predictions: UP={best_result['n_up_pred']}, DOWN={best_result['n_down_pred']}")
-
-# ============================================
-# 11. SAVE MODEL
-# ============================================
-
-with open(f"trained_model_{SYMBOL}.pkl", "wb") as f:
-    pickle.dump(best_network, f)
-
-scaler_params = {
-    "mean": mean,
-    "std": std,
-    "y_mean": y_mean,
-    "y_std": y_std,
-    "feature_cols": feature_cols,
-    "split_idx": split_idx,
-    "train_start": dates_train[0],
-    "train_end": dates_train[-1],
-    "test_start": dates_test[0],
-    "test_end": dates_test[-1],
-    "threshold": best_threshold,
-    "down_weight": best_result["down_weight"],
-    "target_down_ratio": best_result["target_down_ratio"],
-    "symbol": SYMBOL,
-}
-with open(f"scaler_params_{SYMBOL}.pkl", "wb") as f:
-    pickle.dump(scaler_params, f)
-
-print(f"\n✓ Model and parameters saved for {SYMBOL}!")
-
-# ============================================
-# 12. DETAILED EVALUATION
-# ============================================
-
-print(f"\n{'=' * 60}")
-print(f"DETAILED EVALUATION FOR {SYMBOL}")
-print(f"{'=' * 60}")
-
-y_pred_test = best_y_pred
-pred_direction = np.where(y_pred_test.flatten() > best_threshold, 1, -1)
-actual_direction = np.sign(y_test)
-
-print(f"\nThreshold: {best_threshold:.4f}")
-
-print("\nSAMPLE PREDICTIONS (First 30 test samples):")
-print("Date       | Actual   | Predicted | Pred Dir | Correct")
-print("-" * 65)
-
-for i in range(min(30, len(y_test))):
-    date_val = dates_test[i]
-    date_str = pd.Timestamp(date_val).strftime("%Y-%m-%d")
-
-    actual = y_test[i]
-    pred = y_pred_test[i][0]
-    pred_dir = "UP" if pred > best_threshold else "DOWN"
-    actual_dir = "UP" if actual > 0 else "DOWN"
-    correct = "✓" if np.sign(actual) == np.sign(pred - best_threshold) else "✗"
-    print(f"{date_str} | {actual:+.6f} | {pred:+.6f} | {pred_dir:4s} | {correct}")
-
-# Confusion matrix
-print("\nConfusion Matrix Summary:")
-correct_up = np.sum((actual_direction == 1) & (pred_direction == 1))
-total_up = np.sum(actual_direction == 1)
-correct_down = np.sum((actual_direction == -1) & (pred_direction == -1))
-total_down = np.sum(actual_direction == -1)
-
-print(f"  True Up: {total_up}, Pred Up: {correct_up} ({correct_up / total_up:.1%})")
-print(
-    f"  True Down: {total_down}, Pred Down: {correct_down} ({correct_down / total_down:.1%})"
-)
-
-print(f"\n{'=' * 60}")
-print("TRAINING COMPLETE!")
-print(f"{'=' * 60}")
+    return {
+        "network": best_network,
+        "scaler_params": scaler_params,
+        "results": best_result,
+        "predictions": y_pred_test,
+        "actuals": y_test,
+        "dates_test": dates_test,
+    }
